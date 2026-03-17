@@ -124,6 +124,72 @@ class AuthenticationController extends Controller
     }
 
     // -------------------------------------------------------------------------
+    // CHECK EMAIL AVAILABILITY
+    // -------------------------------------------------------------------------
+
+    public function checkEmailAvailability(Request $request)
+    {
+        try {
+            $request->validate([
+                'email' => 'required|email',
+            ]);
+
+            $email = $request->email;
+            $exists = User::where('email', $email)->exists();
+
+            if ($exists) {
+                return ResponseHelper::jsonResponse(422, 'Email already exists', [
+                    'available' => false,
+                    'message' => 'This email is already registered'
+                ]);
+            }
+
+            return ResponseHelper::jsonResponse(200, 'Email is available', [
+                'available' => true,
+                'message' => 'Email is available for registration'
+            ]);
+
+        } catch (ValidationException $e) {
+            return ResponseHelper::jsonResponse(422, 'Validation error', $e->errors());
+        } catch (\Exception $e) {
+            return ResponseHelper::jsonResponse(500, 'Check failed', $e->getMessage());
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // CHECK PHONE AVAILABILITY
+    // -------------------------------------------------------------------------
+
+    public function checkPhoneAvailability(Request $request)
+    {
+        try {
+            $request->validate([
+                'phone' => 'required|string|max:20',
+            ]);
+
+            $phone = $request->phone;
+            $exists = User::where('phone', $phone)->exists();
+
+            if ($exists) {
+                return ResponseHelper::jsonResponse(422, 'Phone already exists', [
+                    'available' => false,
+                    'message' => 'This phone number is already registered'
+                ]);
+            }
+
+            return ResponseHelper::jsonResponse(200, 'Phone is available', [
+                'available' => true,
+                'message' => 'Phone number is available for registration'
+            ]);
+
+        } catch (ValidationException $e) {
+            return ResponseHelper::jsonResponse(422, 'Validation error', $e->errors());
+        } catch (\Exception $e) {
+            return ResponseHelper::jsonResponse(500, 'Check failed', $e->getMessage());
+        }
+    }
+
+    // -------------------------------------------------------------------------
     // LOGIN
     // Flow: login() → kirim OTP → verifyOtp(purpose:login) → dapat JWT token
     // -------------------------------------------------------------------------

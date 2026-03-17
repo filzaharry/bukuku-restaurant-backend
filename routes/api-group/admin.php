@@ -23,6 +23,8 @@ Route::prefix('fnb')->group(function () {
         Route::delete('/{id}', [FnbCategoryController::class, 'destroy']);
     });
 
+    Route::get('/kitchen', [FnbOrderController::class, 'kitchen']);
+    
     Route::prefix('order')->group(function () {
         Route::get('/', [FnbOrderController::class, 'index']);
         Route::post('/', [FnbOrderController::class, 'store']);
@@ -30,6 +32,7 @@ Route::prefix('fnb')->group(function () {
         Route::get('/{id}', [FnbOrderController::class, 'show']);
         Route::post('/{id}', [FnbOrderController::class, 'update']);
         Route::delete('/{id}', [FnbOrderController::class, 'destroy']);
+
         Route::get('/{id}/{status}', [FnbOrderController::class, 'updateStatus']);
     });
 

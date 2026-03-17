@@ -42,20 +42,15 @@ class FnbOrderController extends Controller
 
             $validated = $request->validate([
                 'order_code' => 'required|string|unique:orders,order_code',
+                'table_id' => 'required|integer',
                 'customer_name' => 'required|string',
-                'customer_image' => 'nullable|string',
                 'customer_phone' => 'nullable|string',
-                'payment_method' => 'required|string',
-                'payment_qris' => 'nullable|string',
-                'delivery_id' => 'nullable|integer',
                 'subtotal' => 'required|numeric',
                 'tax' => 'required|numeric',
                 'total' => 'required|numeric',
                 'status' => 'required|integer',
                 'items' => 'required|array',
                 'items.*.fnb_id' => 'required|integer',
-                'items.*.level_id' => 'nullable|integer',
-                'items.*.extra_id' => 'nullable|integer',
                 'items.*.price' => 'required|numeric',
                 'items.*.quantity' => 'nullable|integer|min:1',
             ]);
@@ -70,8 +65,6 @@ class FnbOrderController extends Controller
             foreach ($validated['items'] as $item) {
                 $order->details()->create([
                     'fnb_id' => $item['fnb_id'],
-                    'level_id' => $item['level_id'] ?? null,
-                    'extra_id' => $item['extra_id'] ?? null,
                     'price' => $item['price'],
                     'quantity' => $item['quantity'] ?? 1,
                 ]);
@@ -95,26 +88,7 @@ class FnbOrderController extends Controller
             // 2. Ambil order + relasi dasar
             $order = Order::with([
                 'details.fnb:id,name,price,image',
-                'details.level:id,name,price',
-                'delivery:id,name,price,tax_percent',
             ])->findOrFail($id);
-
-            // 3. Tangani extra_id yang pakai koma
-            foreach ($order->details as $detail) {
-                if (!empty($detail->extra_id)) {
-                    // Ubah string "1,2,3" jadi array [1,2,3]
-                    $extraIds = array_filter(explode(',', $detail->extra_id));
-
-                    // Ambil data extra dari master
-                    $extras = \App\Models\Content\FnbExtra::whereIn('id', $extraIds)
-                        ->get(['id', 'name', 'price']);
-
-                    // Simpan ke property baru (tidak menimpa relasi)
-                    $detail->extras = $extras;
-                } else {
-                    $detail->extras = collect(); // kalau tidak ada extras
-                }
-            }
 
             // 4. Group order details seperti sebelumnya
             $groupedDetails = $this->groupOrderDetails($order->details);
@@ -244,191 +218,39 @@ class FnbOrderController extends Controller
         }
     }
 
-    public function refundOrder(Request $request)
+
+    public function kitchen(Request $request)
     {
         try {
             AuthHelper::requireAuth();
 
-            $request->validate([
-                'status' => 'required',
-                'order_id' => 'required|integer|exists:orders,id',
-                'nominal' => 'nullable|numeric',
-                'notes' => 'nullable|string',
-                'detail' => 'nullable|string',
-            ]);
+            $query = Order::with(['details.fnb:id,name,image'])
+                ->where('status', 1)
+                ->orderBy('created_at', 'desc');
 
-            $order = Order::whereNull('deleted_by_id')->find($request->order_id);
+            $data = FilterHelper::filterAndPaginate($query, $request);
 
-            if (!$order) {
-                return ResponseHelper::jsonResponse(404, 'Order not found', null);
-            }
+            $data['data'] = collect($data['data'])->map(function ($order) {
+                return [
+                    'id' => $order->id,
+                    'table_id' => $order->table_id,
+                    'order_code' => $order->order_code,
+                    'customer_name' => $order->customer_name,
+                    'created_at' => $order->created_at,
+                    'details' => $order->details->map(function ($detail) {
+                        return [
+                            'quantity' => $detail->quantity,
+                            'fnb' => [
+                                'name' => $detail->fnb->name ?? null
+                            ]
+                        ];
+                    })
+                ];
+            });
 
-            DB::beginTransaction();
-
-            $updateData = [
-                'refund_status' => 1,
-                'updated_by_id' => AuthHelper::getAuthUserId(),
-            ];
-
-            if (!is_null($request->nominal)) {
-                $updateData['refund_nominal'] = $request->nominal;
-            }
-            if (!is_null($request->notes)) {
-                $updateData['refund_notes'] = $request->notes;
-            }
-            if (!is_null($request->detail)) {
-                $updateData['refund_detail'] = $request->detail;
-            }
-
-            // Decode detail
-            $details = $request->detail ? json_decode($request->detail, true) : [];
-            $refundedFnbIds = collect($details)->pluck('fnb_id')->filter()->all();
-
-            // Update status FnbMenu yang direfund
-            if (is_array($details)) {
-                foreach ($details as $item) {
-                    if (isset($item['fnb_id'])) {
-                        $fnb = FnbMenu::find($item['fnb_id']);
-                        if ($fnb) {
-                            $fnb->status = 0;
-                            $fnb->save();
-                        }
-                    }
-                }
-            }
-
-            // Update order yang sedang direfund
-            $order->update($updateData);
-
-            // Cari order lain hari ini dengan status 0 atau 1
-            $otherOrders = Order::whereNull('deleted_by_id')
-                ->whereIn('status', [0, 1])
-                ->whereDate('created_at', now()->toDateString())
-                ->where('id', '!=', $order->id)
-                ->get();
-
-            foreach ($otherOrders as $otherOrder) {
-                $otherFnbIds = $otherOrder->details()->pluck('fnb_id')->all();
-                $matchingFnbIds = array_intersect($refundedFnbIds, $otherFnbIds);
-
-                if (!empty($matchingFnbIds)) {
-                    $otherRefundDetails = collect($details)
-                        ->whereIn('fnb_id', $matchingFnbIds)
-                        ->values()
-                        ->all();
-
-                    $otherOrder->update([
-                        'status' => 3, // stok habis
-                        'refund_notes' => $request->notes,
-                        'refund_detail' => json_encode($otherRefundDetails),
-                        'updated_by_id' => AuthHelper::getAuthUserId(),
-                    ]);
-                }
-            }
-
-            DB::commit();
-
-            return ResponseHelper::jsonResponse(200, 'Refund processed successfully', $order);
+            return ResponseHelper::jsonResponse(200, 'Kitchen orders fetched successfully', $data);
         } catch (\Exception $e) {
-            DB::rollBack();
-            return ResponseHelper::jsonResponse(500, 'Failed to process refund', $e->getMessage());
-        }
-    }
-
-    public function update(Request $request, $id)
-    {
-        try {
-            AuthHelper::requireAuth();
-
-            $validated = $request->validate([
-                'customer_name' => 'required|string',
-                'customer_image' => 'nullable|string',
-                'customer_phone' => 'nullable|string',
-                'payment_method' => 'required|string',
-                'payment_qris' => 'nullable|string',
-                'delivery_id' => 'nullable|integer',
-                'subtotal' => 'required|numeric',
-                'tax' => 'required|numeric',
-                'total' => 'required|numeric',
-                'status' => 'required|integer',
-                'items' => 'required|array',
-                'items.*.fnb_id' => 'required|integer|exists:fnb_menus,id',
-                'items.*.level_id' => 'nullable|integer|exists:fnb_levels,id',
-                'items.*.extra_id' => 'nullable|integer|exists:fnb_extras,id',
-                'items.*.price' => 'required|numeric',
-                'items.*.quantity' => 'nullable|integer|min:1',
-            ]);
-
-            $order = Order::findOrFail($id);
-
-            DB::beginTransaction();
-
-            $order->update([
-                ...Arr::except($validated, ['items']),
-                'updated_by_id' => AuthHelper::id(),
-            ]);
-
-            // Delete existing items (simplest way)
-            $order->details()->delete();
-
-            // Recreate order details
-            foreach ($validated['items'] as $item) {
-                $order->details()->create([
-                    'fnb_id' => $item['fnb_id'],
-                    'level_id' => $item['level_id'] ?? null,
-                    'extra_id' => $item['extra_id'] ?? null,
-                    'price' => $item['price'],
-                    'quantity' => $item['quantity'] ?? 1,
-                ]);
-            }
-
-            DB::commit();
-
-            return ResponseHelper::jsonResponse(200, 'Order updated successfully', $order);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return ResponseHelper::jsonResponse(500, 'Failed to update order', $e->getMessage());
-        }
-    }
-
-    public function returnItems(Request $request)
-    {
-        try {
-            AuthHelper::requireAuth();
-
-            $validated = $request->validate([
-                'order_id' => 'required|integer|exists:orders,id',
-                'phone' => 'required|string',
-                'items' => 'required|array',
-                'items.*.fnb_id' => 'required|integer|exists:fnb_menus,id',
-                'items.*.level_id' => 'nullable|integer|exists:fnb_levels,id',
-                'items.*.extra_id' => 'nullable|integer|exists:fnb_extras,id',
-                'items.*.price' => 'required|numeric',
-                'items.*.quantity' => 'required|integer|min:1',
-            ]);
-
-            $order = Order::findOrFail($validated['order_id']);
-
-            DB::beginTransaction();
-
-            foreach ($validated['items'] as $item) {
-                OrderReturn::create([
-                    'order_id' => $order->id,
-                    'fnb_id' => $item['fnb_id'],
-                    'level_id' => $item['level_id'] ?? null,
-                    'extra_id' => $item['extra_id'] ?? null,
-                    'price' => $item['price'],
-                    'quantity' => $item['quantity'],
-                    'phone' => $validated['phone'],
-                ]);
-            }
-
-            DB::commit();
-
-            return ResponseHelper::jsonResponse(200, 'Items returned successfully');
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return ResponseHelper::jsonResponse(500, 'Failed to process return', $e->getMessage());
+            return ResponseHelper::jsonResponse(500, 'Failed to fetch kitchen orders', $e->getMessage());
         }
     }
 }

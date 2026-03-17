@@ -13,6 +13,15 @@ Route::prefix('auth')->group(function () {
          ->middleware('rate.limit:3,1') // 3 attempts per 1 minute
          ->name('register');
     
+    // Availability check endpoints
+    Route::post('/check-email', [AuthenticationController::class, 'checkEmailAvailability'])
+         ->middleware('rate.limit:10,1') // 10 attempts per 1 minute
+         ->name('check.email');
+    
+    Route::post('/check-phone', [AuthenticationController::class, 'checkPhoneAvailability'])
+         ->middleware('rate.limit:10,1') // 10 attempts per 1 minute
+         ->name('check.phone');
+    
     // Google login with moderate rate limiting
     Route::post('/google', [AuthenticationController::class, 'googleLogin'])
          ->middleware('rate.limit:10,1') // 10 attempts per 1 minute

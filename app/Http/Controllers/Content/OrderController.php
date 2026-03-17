@@ -51,7 +51,7 @@ class OrderController extends Controller
                 'status' => 1, // 1 = used, 0 = available
             ]);
 
-            // Step 3: Hitung subtotal dari semua item, level, dan extra
+            // Step 3: Hitung subtotal dari semua item
             $subtotal = 0;
             foreach ($validated['items'] as $item) {
                 $fnb = FnbMenu::findOrFail($item['fnb_id']);
@@ -65,6 +65,8 @@ class OrderController extends Controller
                 'customer_name' => $validated['customer_name'],
                 'customer_phone' => $validated['customer_phone'],
                 'subtotal' => $subtotal,
+                'tax' => 11,
+                'total' => $subtotal + ($subtotal * 0.11),
                 'status' => 0,
             ]);
 
