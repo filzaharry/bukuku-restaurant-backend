@@ -14,12 +14,6 @@ class HomeController extends Controller
     public function fnbCategoryList(Request $request)
     {
         try {
-            // Cek Redis
-            $cached = \Illuminate\Support\Facades\Redis::get('fnb_categories');
-            if ($cached) {
-                return ResponseHelper::jsonResponse(200, 'Menu category list fetched successfully from cache', json_decode($cached, true));
-            }
-
             $query = FnbCategory::whereNull('deleted_by_id')->where('status', 1);
             $result = FilterHelper::filterAndPaginate($query, $request);
             $result['data'] = collect($result['data'])->map(function ($item) {
@@ -31,9 +25,6 @@ class HomeController extends Controller
                 ];
             });
 
-            // Set Redis
-            \Illuminate\Support\Facades\Redis::setex('fnb_categories', 3600, json_encode($result)); // Cache 1 Jam
-
             return ResponseHelper::jsonResponse(200, 'Menu category list fetched successfully', $result);
         } catch (\Exception $e) {
             return ResponseHelper::jsonResponse(500, 'Failed to fetch menu category list', $e->getMessage());
@@ -43,15 +34,6 @@ class HomeController extends Controller
     public function fnbList(Request $request)
     {
         try {
-            // Note: cache with pagination can be tricky, if no parameter search is provided we can cache it
-            // we will cache the exact query based on URL path parameters
-            $cacheKey = 'fnb_items_' . md5(json_encode($request->all()));
-            
-            $cached = \Illuminate\Support\Facades\Redis::get($cacheKey);
-            if ($cached) {
-                return ResponseHelper::jsonResponse(200, 'Menu list fetched successfully from cache', json_decode($cached, true));
-            }
-
             $query = FnbMenu::with([
                 'category' => function ($query) {
                     $query->select('id', 'name');
@@ -95,9 +77,6 @@ class HomeController extends Controller
                 ];
             });
 
-            // Remember cache for 1 hour
-            \Illuminate\Support\Facades\Redis::setex($cacheKey, 3600, json_encode($result));
-
             return ResponseHelper::jsonResponse(200, 'Menu list fetched successfully', $result);
         } catch (\Exception $e) {
             return ResponseHelper::jsonResponse(500, 'Failed to fetch menu list', $e->getMessage());
@@ -107,13 +86,6 @@ class HomeController extends Controller
     public function fnbDetail($id)
     {
         try {
-            $cacheKey = 'fnb_item_detail_' . $id;
-            $cached = \Illuminate\Support\Facades\Redis::get($cacheKey);
-            
-            if ($cached) {
-                return ResponseHelper::jsonResponse(200, 'FNB detail fetched successfully from cache', json_decode($cached, true));
-            }
-
             $fnb = FnbMenu::with([
                 'category:id,name',
                 'levels:id,name,price',
@@ -154,9 +126,6 @@ class HomeController extends Controller
                     ];
                 })->values(),
             ];
-
-            // Cache untuk 1 Jam
-            \Illuminate\Support\Facades\Redis::setex($cacheKey, 3600, json_encode($result));
 
             return ResponseHelper::jsonResponse(200, 'FNB detail fetched successfully', $result);
         } catch (\Exception $e) {

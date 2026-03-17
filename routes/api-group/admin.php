@@ -3,6 +3,7 @@
 use App\Http\Controllers\Content\FnbMenuController;
 use App\Http\Controllers\Content\FnbCategoryController;
 use App\Http\Controllers\Content\FnbOrderController;
+use App\Http\Controllers\Content\FnbTableController;
 use Illuminate\Support\Facades\Route;
 
 
@@ -37,11 +38,11 @@ Route::prefix('fnb')->group(function () {
     });
 
     Route::prefix('table')->group(function () {
-        Route::get('/', [\App\Http\Controllers\Content\FnbTableController::class, 'index']);
-        Route::get('/count', [\App\Http\Controllers\Content\FnbTableController::class, 'count']);
-        Route::post('/', [\App\Http\Controllers\Content\FnbTableController::class, 'store']);
-        Route::get('/{id}', [\App\Http\Controllers\Content\FnbTableController::class, 'show']);
-        Route::post('/{id}', [\App\Http\Controllers\Content\FnbTableController::class, 'update']);
-        Route::delete('/{id}', [\App\Http\Controllers\Content\FnbTableController::class, 'destroy']);
+        Route::get('/', [FnbTableController::class, 'index']);
+        Route::get('/count', [FnbTableController::class, 'count']);
+        Route::post('/', [FnbTableController::class, 'store']);
+        Route::get('/{id}', [FnbTableController::class, 'show']);
+        Route::post('/{id}', [FnbTableController::class, 'update']);
+        Route::delete('/{id}', [FnbTableController::class, 'destroy']);
     });
 });

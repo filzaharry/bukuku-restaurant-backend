@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Content;
 
+use App\Helpers\CacheHelper;
 use App\Helpers\FilterHelper;
 use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Controller;
@@ -9,9 +10,23 @@ use App\Models\Content\FnbCategory;
 use App\Models\Content\FnbMenu;
 use App\Models\Content\FnbTable;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Redis;
 
 class PosController extends Controller
 {
+    /**
+     * Clear all FNB related cache (Public endpoint)
+     */
+    public function clearCache()
+    {
+        try {
+            CacheHelper::clearFnbCache();
+            return ResponseHelper::jsonResponse(200, 'All FNB cache cleared successfully');
+        } catch (\Exception $e) {
+            return ResponseHelper::jsonResponse(500, 'Failed to clear cache', $e->getMessage());
+        }
+    }
+
     /**
      * Get table by unique ID (used for QR code scan)
      */
@@ -39,6 +54,13 @@ class PosController extends Controller
     public function getCategories(Request $request)
     {
         try {
+            // Check Redis Cache
+            $cacheKey = 'fnb_pos_categories_' . md5(json_encode($request->all()));
+            $cached = Redis::get($cacheKey);
+            if ($cached) {
+                return ResponseHelper::jsonResponse(200, 'Category list fetched successfully from cache', json_decode($cached, true));
+            }
+
             $query = FnbCategory::whereNull('deleted_by_id')->where('status', 1);
             $result = FilterHelper::filterAndPaginate($query, $request);
             
@@ -50,6 +72,9 @@ class PosController extends Controller
                     'status' => $item['status'],
                 ];
             });
+
+            // Store in Redis (1 Hour)
+            Redis::setex($cacheKey, 3600, json_encode($result));
 
             return ResponseHelper::jsonResponse(200, 'Category list fetched successfully', $result);
         } catch (\Exception $e) {
@@ -63,6 +88,13 @@ class PosController extends Controller
     public function getItems(Request $request)
     {
         try {
+            // Check Redis Cache
+            $cacheKey = 'fnb_pos_items_' . md5(json_encode($request->all()));
+            $cached = Redis::get($cacheKey);
+            if ($cached) {
+                return ResponseHelper::jsonResponse(200, 'Item list fetched successfully from cache', json_decode($cached, true));
+            }
+
             $query = FnbMenu::with([
                 'category' => function ($query) {
                     $query->select('id', 'name');
@@ -105,6 +137,9 @@ class PosController extends Controller
                     ] : null,
                 ];
             });
+
+            // Store in Redis (1 Hour)
+            Redis::setex($cacheKey, 3600, json_encode($result));
 
             return ResponseHelper::jsonResponse(200, 'Item list fetched successfully', $result);
         } catch (\Exception $e) {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Content;
 use App\Helpers\AttachmentHelper;
 use App\Http\Controllers\Controller;
 use App\Helpers\AuthHelper;
+use App\Helpers\CacheHelper;
 use App\Helpers\FilterHelper;
 use App\Helpers\ResponseHelper;
 use App\Models\Content\FnbCategory;
@@ -58,7 +59,7 @@ class FnbCategoryController extends Controller
             AuthHelper::requireAuth();
 
             $validated = $request->validate([
-                'name' => 'required|string|max:255|unique:master_fnb_category,name',
+                'name' => 'required|string|max:255',
             ]);
 
             DB::beginTransaction();
@@ -70,6 +71,9 @@ class FnbCategoryController extends Controller
             ]);
 
             DB::commit();
+
+            // Clear Cache
+            CacheHelper::clearFnbCache();
 
             return ResponseHelper::jsonResponse(201, 'Data created successfully', $data);
         } catch (ValidationException $e) {
@@ -93,7 +97,7 @@ class FnbCategoryController extends Controller
             }
 
             $validated = $request->validate([
-                'name' => 'sometimes|required|string|max:255|unique:master_fnb_category,name,' . $id,
+                'name' => 'sometimes|required|string|max:255',
                 'status' => 'nullable|in:0,1',
                 'image' => 'nullable|file|mimes:jpg,jpeg,png|max:2048',
             ]);
@@ -123,6 +127,9 @@ class FnbCategoryController extends Controller
             $data->update($updatePayload);
 
             DB::commit();
+
+            // Clear Cache
+            CacheHelper::clearFnbCache();
 
             return ResponseHelper::jsonResponse(200, 'Data updated successfully', $data);
         } catch (ValidationException $e) {
@@ -158,6 +165,9 @@ class FnbCategoryController extends Controller
             ]);
 
             DB::commit();
+
+            // Clear Cache
+            CacheHelper::clearFnbCache();
 
             return ResponseHelper::jsonResponse(200, 'Data deleted successfully', null);
         } catch (\Exception $e) {

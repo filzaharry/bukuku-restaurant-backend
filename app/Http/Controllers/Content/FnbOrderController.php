@@ -35,50 +35,6 @@ class FnbOrderController extends Controller
         }
     }
 
-    public function store(Request $request)
-    {
-        try {
-            AuthHelper::requireAuth();
-
-            $validated = $request->validate([
-                'order_code' => 'required|string|unique:orders,order_code',
-                'table_id' => 'required|integer',
-                'customer_name' => 'required|string',
-                'customer_phone' => 'nullable|string',
-                'subtotal' => 'required|numeric',
-                'tax' => 'required|numeric',
-                'total' => 'required|numeric',
-                'status' => 'required|integer',
-                'items' => 'required|array',
-                'items.*.fnb_id' => 'required|integer',
-                'items.*.price' => 'required|numeric',
-                'items.*.quantity' => 'nullable|integer|min:1',
-            ]);
-
-            DB::beginTransaction();
-
-            $order = Order::create([
-                ...Arr::except($validated, ['items']),
-                'created_by_id' => auth()->id(),
-            ]);
-
-            foreach ($validated['items'] as $item) {
-                $order->details()->create([
-                    'fnb_id' => $item['fnb_id'],
-                    'price' => $item['price'],
-                    'quantity' => $item['quantity'] ?? 1,
-                ]);
-            }
-
-            DB::commit();
-
-            return ResponseHelper::jsonResponse(201, 'Order created successfully', $order);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return ResponseHelper::jsonResponse(500, 'Failed to create order', $e->getMessage());
-        }
-    }
-
     public function show($id)
     {
         try {

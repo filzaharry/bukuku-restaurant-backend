@@ -38,13 +38,6 @@ class DropdownController extends Controller
         try {
             AuthHelper::requireAuth();
 
-            $cacheKey = 'dropdown_fnb_category_' . md5(json_encode($request->all()));
-            $cached = \Illuminate\Support\Facades\Redis::get($cacheKey);
-            
-            if ($cached) {
-                return ResponseHelper::jsonResponse(200, 'dropdown fetched from cache', json_decode($cached, true));
-            }
-
             $data = FnbCategory::select('id', 'name')
                 ->whereNull('deleted_by_id')
                 ->when($request->query('search'), function ($query, $search) {
@@ -54,8 +47,6 @@ class DropdownController extends Controller
                 })
                 ->orderBy('name')
                 ->get();
-
-            \Illuminate\Support\Facades\Redis::setex($cacheKey, 3600, json_encode($data));
 
             return ResponseHelper::jsonResponse(200, 'dropdown fetched', $data);
         } catch (\Exception $e) {
@@ -68,13 +59,6 @@ class DropdownController extends Controller
         try {
             AuthHelper::requireAuth();
 
-            $cacheKey = 'dropdown_fnb_table_' . md5(json_encode($request->all()));
-            $cached = \Illuminate\Support\Facades\Redis::get($cacheKey);
-            
-            if ($cached) {
-                return ResponseHelper::jsonResponse(200, 'dropdown fetched from cache', json_decode($cached, true));
-            }
-
             $data = FnbTable::select('id', 'name')
                 ->where('status', 0)
                 ->whereNull('deleted_by_id')
@@ -85,9 +69,6 @@ class DropdownController extends Controller
                 })
                 ->orderBy('name')
                 ->get();
-
-            // Cache tables for a short time to prevent DB spike but keep relatively fresh
-            \Illuminate\Support\Facades\Redis::setex($cacheKey, 30, json_encode($data));
 
             return ResponseHelper::jsonResponse(200, 'dropdown fetched', $data);
         } catch (\Exception $e) {

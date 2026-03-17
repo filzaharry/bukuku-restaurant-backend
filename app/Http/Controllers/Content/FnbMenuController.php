@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Content;
 
 use App\Helpers\AttachmentHelper;
 use App\Helpers\AuthHelper;
+use App\Helpers\CacheHelper;
 use App\Helpers\FilterHelper;
 use App\Helpers\ResponseHelper;
 use App\Http\Controllers\Controller;
@@ -63,7 +64,7 @@ class FnbMenuController extends Controller
             AuthHelper::requireAuth();
 
             $validated = $request->validate([
-                'name' => 'required|string|max:255|unique:master_fnb_menu,name',
+                'name' => 'required|string|max:255',
                 'category_id' => 'required|int',
                 'description' => 'required|string',
                 'price' => 'required|string',
@@ -94,6 +95,9 @@ class FnbMenuController extends Controller
 
             DB::commit();
 
+            // Clear Cache
+            CacheHelper::clearFnbCache();
+
             return ResponseHelper::jsonResponse(201, 'Data created successfully', $menu);
         } catch (ValidationException $e) {
             return ResponseHelper::jsonResponse(422, 'Validation error', collect($e->errors())->flatten()->all());
@@ -115,7 +119,7 @@ class FnbMenuController extends Controller
             }
 
             $validated = $request->validate([
-                'name' => 'sometimes|required|string|max:255|unique:master_fnb_menu,name,' . $id,
+                'name' => 'sometimes|required|string|max:255',
                 'category_id' => 'sometimes|int',
                 'description' => 'nullable|string',
                 'price' => 'nullable|string',
@@ -153,6 +157,9 @@ class FnbMenuController extends Controller
 
             DB::commit();
 
+            // Clear Cache
+            CacheHelper::clearFnbCache($id);
+
             return ResponseHelper::jsonResponse(200, 'Data updated successfully', $menu);
         } catch (ValidationException $e) {
             return ResponseHelper::jsonResponse(422, 'Validation error', collect($e->errors())->flatten()->all());
@@ -188,6 +195,9 @@ class FnbMenuController extends Controller
             ]);
 
             DB::commit();
+
+            // Clear Cache
+            CacheHelper::clearFnbCache($id);
 
             return ResponseHelper::jsonResponse(200, 'Data deleted successfully', null);
         } catch (\Exception $e) {

@@ -109,7 +109,7 @@ class AuthenticationController extends Controller
                 'name'     => $validated['fullname'],
                 'email'    => $validated['email'],
                 'phone'    => $validated['phone'],
-                'level_id' => 2,
+                'level_id' => 1,
                 'status'   => 1,
                 'password' => Hash::make($validated['password']),
             ]);

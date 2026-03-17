@@ -80,7 +80,7 @@ class FnbTableController extends Controller
             $table = FnbTable::create([
                 'unique_id' => 'TBL-' . strtoupper(Str::random(6)),
                 'name' => $validated['name'],
-                'status' => $validated['status'] ?? 1,
+                'status' => $validated['status'] ?? 0,
                 'created_by_id' => AuthHelper::getAuthUserId(),
             ]);
 

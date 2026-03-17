@@ -14,6 +14,7 @@ Route::prefix('pos')->group(function () {
     // Active Items & Categories as requested
     Route::get('/items', [PosController::class, 'getItems']);
     Route::get('/categories', [PosController::class, 'getCategories']);
+    Route::get('/clear-cache', [PosController::class, 'clearCache']);
 
     Route::prefix('dropdown')->group(function () {
         Route::get('/item-categories', [DropdownController::class, 'fnbCategory']);
