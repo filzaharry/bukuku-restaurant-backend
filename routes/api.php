@@ -25,6 +25,6 @@ Route::prefix('v1')->group(function () {
     // CMS POS auth
     Route::middleware('auth:jwt')->group(function () {
         require __DIR__ . '/api-group/util.php';
-        require __DIR__ . '/api-group/admin.php';
     });
+    require __DIR__ . '/api-group/admin.php';
 });
